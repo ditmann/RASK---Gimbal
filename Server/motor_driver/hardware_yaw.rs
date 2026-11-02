@@ -8,7 +8,7 @@ const STEPS_PER_REV: f32 = 400.0;
 // Initial bench-test limit: approximately +/- 4.5 degrees
 const MAX_TEST_STEPS: i64 = 400;
 
-const STEP_DELAY: Duration = Duration::from_millis(0);
+const STEP_DELAY: Duration = Duration::from_millis(1);
 
 pub struct HardwareYaw {
     pul: OutputPin,
