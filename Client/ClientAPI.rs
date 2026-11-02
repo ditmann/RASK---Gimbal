@@ -1,42 +1,117 @@
+mod validator;
 
-use std::net::UdpSocket;
-use std::time::{Duration, Instant};
+use std::io::{self, ErrorKind};
+use std::net::{SocketAddr, UdpSocket};
 use std::thread;
+use std::time::{Duration, Instant};
+
+fn send_orientation(
+    socket: &UdpSocket,
+    destination: SocketAddr,
+    millis: u64,
+    yaw: f32,
+    pitch: f32,
+    roll: f32,
+) -> io::Result<usize> {
+    let mut packet = [0u8; 20];
+
+    packet[0..8].copy_from_slice(&millis.to_le_bytes());
+    packet[8..12].copy_from_slice(&yaw.to_le_bytes());
+    packet[12..16].copy_from_slice(&pitch.to_le_bytes());
+    packet[16..20].copy_from_slice(&roll.to_le_bytes());
+
+    socket.send_to(&packet, destination)
+}
 
 fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
+    let destination: SocketAddr =
+        "127.0.0.1:5000".parse().unwrap();
+
+    socket.set_nonblocking(true).unwrap();
+
     let start = Instant::now();
-    let mut yaw: f32 = 0.0;
+
+    let mut last_status: Option<Instant> = None;
+    let mut timeout_reported = false;
+
+    let mut buffer = [0u8; 16];
 
     loop {
-        let millis = start.elapsed().as_millis() as u64;
+        // Get elapsed time
+        let elapsed = start.elapsed();
 
-        let pitch: f32 = 20.0;
-        let roll: f32 = 10.0;
+        let millis = elapsed.as_millis() as u64;
+        let time = elapsed.as_secs_f32();
 
-        if yaw.is_finite() && pitch.is_finite() && roll.is_finite() {
-            let mut packet = [0u8; 20];
+        // Simulate movement on all three axes
+        let yaw: f32 = 45.0 * (time * 0.7).sin();
+        let pitch: f32 = 20.0 * (time * 1.0).sin();
+        let roll: f32 = 10.0 * (time * 1.3).sin();
 
-            packet[0..8].copy_from_slice(&millis.to_le_bytes());
-            packet[8..12].copy_from_slice(&yaw.to_le_bytes());
-            packet[12..16].copy_from_slice(&pitch.to_le_bytes());
-            packet[16..20].copy_from_slice(&roll.to_le_bytes());
+        // Validate before sending
+        if validator::is_valid_orientation(yaw, pitch, roll) {
+            match send_orientation(
+                &socket,
+                destination,
+                millis,
+                yaw,
+                pitch,
+                roll,
+            ) {
+                Ok(_) => {
+                    println!(
+                        "Sent {millis}ms | Y:{yaw:.2} P:{pitch:.2} R:{roll:.2}"
+                    );
+                }
 
-            socket.send_to(&packet, "127.0.0.1:5000").unwrap();
-
-            println!("Sent {millis}ms | Y:{yaw} P:{pitch} R:{roll}");
+                Err(error) => {
+                    println!("Send error: {error}");
+                }
+            }
         } else {
-            println!("Invalid orientation! Packet not sent.");
+            println!("Invalid orientation. Not sent.");
         }
 
-        // Simulated VR rotation
-        yaw += 1.0;
+        match socket.recv_from(&mut buffer) {
+            Ok((size, address))
+            if address == destination
+                && &buffer[..size] == b"OK" =>
+                {
+                    if last_status.is_none() || timeout_reported {
+                        println!("Server connected!");
+                    }
 
-        if yaw > 45.0 {
-            yaw = -45.0;
+                    last_status = Some(Instant::now());
+                    timeout_reported = false;
+                }
+
+            Ok(_) => {
+                // Ignore unknown responses
+            }
+
+            Err(error)
+            if error.kind() == ErrorKind::WouldBlock
+                || error.kind() == ErrorKind::ConnectionReset =>
+                {
+                }
+
+            Err(error) => {
+                println!("Status receive error: {error}");
+            }
         }
 
+        // Check server connection
+        if last_status.unwrap_or(start).elapsed()
+            >= Duration::from_secs(3)
+            && !timeout_reported
+        {
+            println!("Server not responding!");
+            timeout_reported = true;
+        }
+
+        // Approximately 50 updates per second
         thread::sleep(Duration::from_millis(20));
     }
 }

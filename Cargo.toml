@@ -11,4 +11,4 @@ path = "Client/ClientAPI.rs"
 
 [[bin]]
 name = "server"
-path = "Server/ServerAPI.rs"
+path = "Server/main.rs"
