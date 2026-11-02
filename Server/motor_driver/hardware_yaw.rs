@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 const STEPS_PER_REV: f32 = 400.0;
-const MAX_STEPS_PER_UPDATE: usize = 2;
+const MAX_STEPS_PER_UPDATE: usize = 4;
 
 // Initial bench-test limit: approximately +/- 4.5 degrees
 const MAX_TEST_STEPS: i64 = 400;
