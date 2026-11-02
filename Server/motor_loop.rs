@@ -1,3 +1,4 @@
+
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -6,22 +7,30 @@ use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 
 pub fn run(receiver: Receiver<MovementCommand>) {
+    // Create one persistent Gimbal Controller
     let mut controller = GimbalController::new();
 
     let mut has_target = false;
     let mut last_update = Instant::now();
     let mut last_print = Instant::now();
 
-    println!("Motor thread started!");
+    println!("Motor thread started.");
 
     loop {
-        // Read pending commands and keep the latest one
-        let mut latest_command = None;
+        let mut latest_target = None;
+        let mut stop_requested = false;
 
         loop {
             match receiver.try_recv() {
-                Ok(command) => {
-                    latest_command = Some(command);
+                Ok(MovementCommand::SetTarget(orientation)) => {
+                    if !stop_requested {
+                        latest_target = Some(orientation);
+                    }
+                }
+
+                Ok(MovementCommand::Stop) => {
+                    stop_requested = true;
+                    latest_target = None;
                 }
 
                 Err(TryRecvError::Empty) => {
@@ -30,32 +39,25 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
                 Err(TryRecvError::Disconnected) => {
                     controller.clear_target();
-                    println!("Motor thread exiting.");
+                    println!("Motor thread disconnected.");
                     return;
                 }
             }
         }
 
-        // Apply the latest command
-        if let Some(command) = latest_command {
-            match command {
-                MovementCommand::SetTarget(orientation) => {
-                    movement::handle_orientation(
-                        &mut controller,
-                        orientation,
-                    );
 
-                    has_target = true;
-                }
+        if stop_requested {
+            controller.clear_target();
+            has_target = false;
+        } else if let Some(orientation) = latest_target {
+            movement::handle_orientation(
+                &mut controller,
+                orientation,
+            );
 
-                MovementCommand::Stop => {
-                    controller.clear_target();
-                    has_target = false;
-                }
-            }
+            has_target = true;
         }
 
-        // Update all three motors
         let now = Instant::now();
 
         let dt_seconds =
@@ -65,8 +67,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
         last_update = now;
 
-        // Print current motor positions every 200ms
-        if last_print.elapsed() >= Duration::from_millis(200) {
+        if last_print.elapsed() >= Duration::from_millis(500) {
             if has_target {
                 controller.print_status();
             }
@@ -74,7 +75,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             last_print = Instant::now();
         }
 
-        // Approx. 100 updates per second
         thread::sleep(Duration::from_millis(10));
     }
 }

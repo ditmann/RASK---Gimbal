@@ -27,7 +27,7 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
     let destination: SocketAddr =
-        "127.0.0.1:5000".parse().unwrap();
+        "10.57.51.53:5000".parse().unwrap();
 
     socket.set_nonblocking(true).unwrap();
 
@@ -47,8 +47,8 @@ fn main() {
 
         // Simulate movement on all three axes
         let yaw: f32 = 45.0 * (time * 0.7).sin();
-        let pitch: f32 = 20.0 * (time * 1.0).sin();
-        let roll: f32 = 10.0 * (time * 1.3).sin();
+        let pitch: f32 = 20.0;
+        let roll: f32 = 10.0;
 
         // Validate before sending
         if validator::is_valid_orientation(yaw, pitch, roll) {
