@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 const STEPS_PER_REV: f32 = 400.0;
+const MAX_STEPS_PER_UPDATE: usize = 2;
 
 // Initial bench-test limit: approximately +/- 4.5 degrees
 const MAX_TEST_STEPS: i64 = 400;
@@ -49,37 +50,40 @@ impl HardwareYaw {
         );
     }
 
+
     pub fn update(&mut self, _dt_seconds: f32) {
-        let difference =
-            self.target_steps - self.current_steps;
+        for _ in 0..MAX_STEPS_PER_UPDATE {
+            let difference =
+                self.target_steps - self.current_steps;
 
-        if difference == 0 {
-            return;
-        }
+            if difference == 0 {
+                break;
+            }
 
-        if difference > 0 {
-            self.dir.set_high();
-        } else {
-            self.dir.set_low();
-        }
+            if difference > 0 {
+                self.dir.set_high();
+            } else {
+                self.dir.set_low();
+            }
 
-        // Allow direction signal to settle
-        thread::sleep(Duration::from_micros(100));
+            // Direction setup time
+            thread::sleep(Duration::from_micros(100));
 
-        // Generate one STEP pulse
-        self.pul.set_high();
-        thread::sleep(STEP_DELAY);
+            // Generate STEP pulse
+            self.pul.set_high();
+            thread::sleep(STEP_DELAY);
 
-        self.pul.set_low();
-        thread::sleep(STEP_DELAY);
+            self.pul.set_low();
+            thread::sleep(STEP_DELAY);
 
-        // Update estimated position
-        if difference > 0 {
-            self.current_steps += 1;
-        } else {
-            self.current_steps -= 1;
+            if difference > 0 {
+                self.current_steps += 1;
+            } else {
+                self.current_steps -= 1;
+            }
         }
     }
+
 
     pub fn stop(&mut self) {
         self.target_steps = self.current_steps;
