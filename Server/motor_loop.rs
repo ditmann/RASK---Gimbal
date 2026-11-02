@@ -67,7 +67,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
         last_update = now;
 
-        if last_print.elapsed() >= Duration::from_millis(500) {
+        if last_print.elapsed() >= Duration::from_millis(50) {
             if has_target {
                 controller.print_status();
             }
