@@ -75,6 +75,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             last_print = Instant::now();
         }
 
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(2));
     }
 }
