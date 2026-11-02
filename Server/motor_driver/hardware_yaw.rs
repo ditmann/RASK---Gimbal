@@ -6,7 +6,7 @@ use std::time::Duration;
 const STEPS_PER_REV: f32 = 400.0;
 
 // Initial bench-test limit: approximately +/- 4.5 degrees
-const MAX_TEST_STEPS: i64 = 5;
+const MAX_TEST_STEPS: i64 = 400;
 
 const STEP_DELAY: Duration = Duration::from_millis(2);
 
@@ -35,7 +35,7 @@ impl HardwareYaw {
 
     pub fn set_target_angle(&mut self, angle: f32) {
         if !angle.is_finite() {
-            return;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+            return;
         }
 
         // Convert degrees into absolute motor steps
