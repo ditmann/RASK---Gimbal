@@ -46,7 +46,7 @@ fn main() {
         let time = elapsed.as_secs_f32();
 
         // Simulate movement on all three axes
-        let yaw: f32 = 45.0 * (time * 0.7).sin();
+        let yaw: f32 = 45.0 * (time * 5.0).sin();
         let pitch: f32 = 20.0;
         let roll: f32 = 10.0;
 

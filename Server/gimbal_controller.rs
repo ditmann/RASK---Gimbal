@@ -9,18 +9,19 @@ pub struct GimbalController {
 
 impl GimbalController {
     pub fn new() -> Self {
+        let yaw_motor = HardwareYaw::new()
+            .expect("Failed to initialize Raspberry Pi GPIO");
+
         Self {
             target: None,
-
-            yaw_motor: HardwareYaw::new()
-                .expect("Failed to initialize yaw GPIO"),
+            yaw_motor,
         }
     }
 
     pub fn set_target(&mut self, orientation: Orientation) {
         self.target = Some(orientation);
 
-        // Only the yaw motor is connected for now
+        // Only yaw is physically connected for now
         self.yaw_motor.set_target_angle(orientation.yaw);
     }
 
@@ -28,11 +29,13 @@ impl GimbalController {
         self.yaw_motor.update(dt_seconds);
     }
 
+    pub fn is_moving(&self) -> bool {
+        self.yaw_motor.is_moving()
+    }
+
     pub fn clear_target(&mut self) {
         self.target = None;
         self.yaw_motor.stop();
-
-        println!("Yaw target cleared.");
     }
 
     pub fn print_status(&self) {
