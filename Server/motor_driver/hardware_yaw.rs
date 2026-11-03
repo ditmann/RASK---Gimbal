@@ -1,197 +1,119 @@
 
-use std::sync::mpsc::{
-    Receiver,
-    RecvTimeoutError,
-    TryRecvError,
-};
+use rppal::gpio::{Gpio, OutputPin};
+use std::thread;
+use std::time::Duration;
 
-use std::time::{Duration, Instant};
+// GPIO pins (BCM numbering)
+const STEP_PIN: u8 = 17;
+const DIR_PIN: u8 = 27;
 
-use crate::gimbal_controller::GimbalController;
-use crate::movement::{self, MovementCommand};
-use crate::orientation::Orientation;
+// Must match the DM332T microstepping configuration
+const STEPS_PER_REV: f32 = 400.0;
 
-// Maximum requested step rate
-const MAX_PULSES_PER_SECOND: u64 = 800;
+// Temporary movement limit for testing
+const MAX_TEST_STEPS: i64 = 5;
 
-const STEP_INTERVAL: Duration =
-    Duration::from_micros(
-        1_000_000 / MAX_PULSES_PER_SECOND
-    );
+// STEP and DIR signal timing
+const PULSE_HIGH_TIME: Duration =
+    Duration::from_micros(100);
 
-// Stop movement if fresh targets stop arriving
-const COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
+const DIRECTION_SETUP_TIME: Duration =
+    Duration::from_micros(100);
 
-fn collect_command(
-    command: MovementCommand,
-    latest_target: &mut Option<Orientation>,
-    stop_requested: &mut bool,
-) {
-    match command {
-        MovementCommand::SetTarget(orientation) => {
-            if !*stop_requested {
-                *latest_target = Some(orientation);
-            }
-        }
+pub struct HardwareYaw {
+    pul: OutputPin,
+    dir: OutputPin,
 
-        MovementCommand::Stop => {
-            *stop_requested = true;
-            *latest_target = None;
-        }
-    }
+    current_steps: i64,
+    target_steps: i64,
+
+    previous_direction: Option<bool>,
 }
 
-pub fn run(receiver: Receiver<MovementCommand>) {
-    let mut controller = GimbalController::new();
+impl HardwareYaw {
+    pub fn new() -> Result<Self, rppal::gpio::Error> {
+        let gpio = Gpio::new()?;
 
-    let mut last_target_at: Option<Instant> = None;
-    let mut last_update = Instant::now();
-    let mut last_print = Instant::now();
+        let pul = gpio.get(STEP_PIN)?.into_output_low();
+        let dir = gpio.get(DIR_PIN)?.into_output_low();
 
-    let mut next_step_at = Instant::now();
+        Ok(Self {
+            pul,
+            dir,
+            current_steps: 0,
+            target_steps: 0,
+            previous_direction: None,
+        })
+    }
 
-    // Stores a command received while waiting
-    let mut pending_command: Option<MovementCommand> = None;
-
-    println!("Motor thread started.");
-
-    loop {
-        let mut latest_target = None;
-        let mut stop_requested = false;
-
-        // Process the command that woke us up
-        if let Some(command) = pending_command.take() {
-            collect_command(
-                command,
-                &mut latest_target,
-                &mut stop_requested,
-            );
+    pub fn set_target_angle(&mut self, angle: f32) {
+        // Reject invalid values
+        if !angle.is_finite() {
+            return;
         }
 
-        // Drain any additional waiting commands
-        loop {
-            match receiver.try_recv() {
-                Ok(command) => {
-                    collect_command(
-                        command,
-                        &mut latest_target,
-                        &mut stop_requested,
-                    );
-                }
+        // Convert yaw angle to motor steps
+        let steps =
+            ((angle / 360.0) * STEPS_PER_REV).round() as i64;
 
-                Err(TryRecvError::Empty) => {
-                    break;
-                }
+        // Restrict movement during testing
+        // self.target_steps = steps.clamp(-MAX_TEST_STEPS, MAX_TEST_STEPS, );
+        self.target_steps = steps;
+    }
 
-                Err(TryRecvError::Disconnected) => {
-                    controller.clear_target();
-                    return;
-                }
-            }
+    pub fn is_moving(&self) -> bool {
+        self.current_steps != self.target_steps
+    }
+
+    pub fn update(&mut self, _dt_seconds: f32) {
+        let difference =
+            self.target_steps - self.current_steps;
+
+        // Already at target
+        if difference == 0 {
+            return;
         }
 
-        // Apply Stop or the latest target
-        if stop_requested {
-            controller.clear_target();
-            last_target_at = None;
-        } else if let Some(orientation) = latest_target {
-            let was_moving = controller.is_moving();
+        let forward = difference > 0;
 
-            movement::handle_orientation(
-                &mut controller,
-                orientation,
-            );
-
-            last_target_at = Some(Instant::now());
-
-            // Start immediately if previously idle
-            if !was_moving {
-                next_step_at = Instant::now();
-            }
-        }
-
-        // Check communication watchdog
-        if let Some(last) = last_target_at {
-            if last.elapsed() >= COMMAND_TIMEOUT {
-                controller.clear_target();
-                last_target_at = None;
-
-                println!("Motor stopped: command timeout.");
-            }
-        }
-
-        // Generate a STEP pulse when due
-        if last_target_at.is_some() && controller.is_moving() {
-            let now = Instant::now();
-
-            if now >= next_step_at {
-                let dt_seconds =
-                    now.duration_since(last_update).as_secs_f32();
-
-                last_update = now;
-
-                controller.update(dt_seconds);
-
-                // Schedule the next pulse from the
-                // start of this pulse, not from the
-                // previous deadline.
-                next_step_at = now + STEP_INTERVAL;
-
-                if last_print.elapsed()
-                    >= Duration::from_millis(500)
-                {
-                    controller.print_status();
-                    last_print = Instant::now();
-                }
-
-                continue;
-            }
-        }
-
-        // Calculate how long we can wait
-        if let Some(last) = last_target_at {
-            let watchdog_deadline =
-                last + COMMAND_TIMEOUT;
-
-            let deadline = if controller.is_moving() {
-                next_step_at.min(watchdog_deadline)
+        // Change DIR only when necessary
+        if self.previous_direction != Some(forward) {
+            if forward {
+                self.dir.set_high();
             } else {
-                watchdog_deadline
-            };
-
-            let wait_time =
-                deadline.saturating_duration_since(
-                    Instant::now()
-                );
-
-            // Wake when a command arrives OR a
-            // motor/watchdog deadline is reached.
-            match receiver.recv_timeout(wait_time) {
-                Ok(command) => {
-                    pending_command = Some(command);
-                }
-
-                Err(RecvTimeoutError::Timeout) => {
-                    // Check deadlines again
-                }
-
-                Err(RecvTimeoutError::Disconnected) => {
-                    controller.clear_target();
-                    return;
-                }
+                self.dir.set_low();
             }
-        } else {
-            // Fully idle: block until a command arrives
-            match receiver.recv() {
-                Ok(command) => {
-                    pending_command = Some(command);
-                }
 
-                Err(_) => {
-                    controller.clear_target();
-                    return;
-                }
-            }
+            // Allow direction signal to settle
+            thread::sleep(DIRECTION_SETUP_TIME);
+
+            self.previous_direction = Some(forward);
         }
+
+        // Generate exactly one STEP pulse
+        self.pul.set_high();
+        thread::sleep(PULSE_HIGH_TIME);
+        self.pul.set_low();
+
+        // Update commanded position
+        if forward {
+            self.current_steps += 1;
+        } else {
+            self.current_steps -= 1;
+        }
+    }
+
+    pub fn stop(&mut self) {
+        // Stop at the current commanded position
+        self.target_steps = self.current_steps;
+        self.pul.set_low();
+    }
+
+    pub fn status(&self) -> String {
+        format!(
+            "Yaw: {} steps (target {})",
+            self.current_steps,
+            self.target_steps
+        )
     }
 }
