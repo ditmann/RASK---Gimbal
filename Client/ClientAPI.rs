@@ -40,6 +40,9 @@ fn main() {
 
     let mut buffer = [0u8; 16];
 
+    let vr = vr::Vr::wait_for_steamvr();
+    
+
     loop {
         // Get elapsed time
         let elapsed = start.elapsed();
