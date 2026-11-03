@@ -138,7 +138,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 next_step_at = now + STEP_INTERVAL;
 
                 if last_print.elapsed()
-                    >= Duration::from_millis(50)
+                    >= Duration::from_millis(1)
                 {
                     controller.print_status();
                     last_print = Instant::now();
