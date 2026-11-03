@@ -41,7 +41,7 @@ fn main() {
     let mut buffer = [0u8; 16];
 
     let vr = vr::Vr::wait_for_steamvr();
-    
+
 
     loop {
         // Get elapsed time
@@ -49,6 +49,15 @@ fn main() {
 
         let millis = elapsed.as_millis() as u64;
         let time = elapsed.as_secs_f32();
+
+        let Some(matrix) = vr.headset_matrix() else {
+            thread::sleep(Duration::from_millis(20));
+            continue;
+        };
+
+        println!("THIS IS THE MATRIX:\n {matrix:?}");
+
+
 
         // Simulate movement on all three axes
         let yaw: f32 = 45.0 * (time * 5.0).sin();

@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
 
-use openvr::{tracked_device_index, ApplicationType, Context, InitError, System, TrackingUniverseOrigin, init};
+use openvr::{tracked_device_index, ApplicationType, Context, InitError, System, TrackingUniverseOrigin};
 
 // koblingen til steam vr
 
@@ -27,7 +27,7 @@ impl Vr {
         loop {
             match Vr::try_connect() {
                 Ok(vr) => {
-                    println!("hello from SteamVR");
+                    println!("Connected to SteamVR");
                     return vr;
                 }
                 Err(error)
