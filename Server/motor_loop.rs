@@ -12,7 +12,7 @@ use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
 // Maximum requested step rate
-const MAX_PULSES_PER_SECOND: u64 = 800;
+const MAX_PULSES_PER_SECOND: u64 = 100;
 
 const STEP_INTERVAL: Duration =
     Duration::from_micros(
@@ -138,7 +138,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 next_step_at = now + STEP_INTERVAL;
 
                 if last_print.elapsed()
-                    >= Duration::from_millis(500)
+                    >= Duration::from_millis(50)
                 {
                     controller.print_status();
                     last_print = Instant::now();
