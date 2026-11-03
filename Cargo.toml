@@ -4,12 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+
+openvr = {version = "0.9", optional = true}
+
 [target.'cfg(target_os = "linux")'.dependencies]
 rppal = "0.22.1"
+
+[features]
+vr = ["dep:openvr"]
+
 
 [[bin]]
 name = "client"
 path = "Client/ClientAPI.rs"
+required-features = ["vr"]
 
 [[bin]]
 name = "server"

@@ -1,4 +1,6 @@
 mod validator;
+mod vr;
+
 
 use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
