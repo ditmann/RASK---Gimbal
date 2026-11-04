@@ -12,7 +12,7 @@ use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
 // Maximum requested step rate
-const MAX_PULSES_PER_SECOND: u64 = 800;
+const MAX_PULSES_PER_SECOND: u64 = 100;
 
 const STEP_INTERVAL: Duration =
     Duration::from_micros(
