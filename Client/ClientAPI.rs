@@ -6,6 +6,7 @@ use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use std::time::{Duration, Instant};
+use crate::matrixToDegrees::Matrix_to_degrees;
 
 fn send_orientation(
     socket: &UdpSocket,
@@ -55,6 +56,7 @@ fn main() {
             continue;
         };
 
+        let yaw_pitch_roll: Vec<f32> = Matrix_to_degrees::matrix_to_yaw_pitch_roll(matrix);
         println!("THIS IS THE MATRIX:\n {matrix:?}");
 
 
