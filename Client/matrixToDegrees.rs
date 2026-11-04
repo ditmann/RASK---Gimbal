@@ -20,8 +20,11 @@ impl MatrixToDegrees {
         //println!("value21: {value21}");
 
         let roll = (value10).asin().to_degrees();
-        let yaw = (-value20).atan2(value00).to_degrees();
-        let pitch = (-value21).atan2(value11).to_degrees();
+        //let yaw = (-value20).atan2(value00).to_degrees();
+        //let pitch = (-value21).atan2(value11).to_degrees();
+
+        let yaw = (-value20/value00).atan().to_degrees();
+        let pitch = (-value21/value11).atan().to_degrees();
 
         println!("yaw_deg: {yaw}");
         println!("pitch_deg: {pitch}");
