@@ -56,7 +56,7 @@ fn main() {
             continue;
         };
 
-        let yaw_pitch_roll: Vec<f32> = Matrix_to_degrees::matrix_to_yaw_pitch_roll(matrix);
+        let _yaw_pitch_roll: Vec<f32> = Matrix_to_degrees::matrix_to_yaw_pitch_roll(matrix);
         println!("THIS IS THE MATRIX:\n {matrix:?}");
 
 
