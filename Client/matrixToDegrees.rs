@@ -1,10 +1,10 @@
 
 
-pub struct Matrix_to_degrees {
+pub struct MatrixToDegrees {
 }
 // input matrix get yaw, pitch and roll
 
-impl Matrix_to_degrees {
+impl MatrixToDegrees {
     pub fn matrix_to_yaw_pitch_roll(matrix:[[f32; 4]; 3]) -> Vec<f32> {
         let value00 = matrix[0][0];
         let value10 = matrix[1][0];
@@ -18,9 +18,9 @@ impl Matrix_to_degrees {
         println!("value11: {value11}");
         println!("value21: {value21}");
 
-        let roll = value10.asin();
-        let yaw = (-value20/value00).atan();
-        let pitch = (-value21/value11).atan();
+        let roll = (value10).asin().to_degrees();
+        let yaw = (-value20).atan2(value00).to_degrees();
+        let pitch = (-value21).atan2(value11).to_degrees();
 
         println!("yaw: {yaw}");
         println!("pitch: {pitch}");

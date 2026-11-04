@@ -13,6 +13,12 @@ rppal = "0.22.1"
 [features]
 vr = ["dep:openvr"]
 
+#for skole pc er denne delen viktig:
+# CMake bygger ellers openvr_sys med debug-CRT (MSVCRTD), som ikke kan
+# lenkes med Rust (MSVCRT). opt-level > 0 gir RelWithDebInfo i CMake.
+[profile.dev.package.openvr_sys]
+opt-level = 1
+
 
 [[bin]]
 name = "client"

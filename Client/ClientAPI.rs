@@ -6,7 +6,7 @@ use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::matrixToDegrees::Matrix_to_degrees;
+use crate::matrixToDegrees::MatrixToDegrees;
 
 fn send_orientation(
     socket: &UdpSocket,
@@ -56,15 +56,11 @@ fn main() {
             continue;
         };
 
-        let _yaw_pitch_roll: Vec<f32> = Matrix_to_degrees::matrix_to_yaw_pitch_roll(matrix);
-        println!("THIS IS THE MATRIX:\n {matrix:?}");
-
-
-
-        // Simulate movement on all three axes
-        let yaw: f32 = 45.0 * (time * 5.0).sin();
-        let pitch: f32 = 20.0;
-        let roll: f32 = 10.0;
+        //yaw will be 0 pitch 1 roll 2
+        let _yaw_pitch_roll: Vec<f32> = MatrixToDegrees::matrix_to_yaw_pitch_roll(matrix);
+        let yaw: f32 = _yaw_pitch_roll[0];
+        let pitch: f32 = _yaw_pitch_roll[1];
+        let roll: f32 = _yaw_pitch_roll[2];
 
         // Validate before sending
         if validator::is_valid_orientation(yaw, pitch, roll) {
