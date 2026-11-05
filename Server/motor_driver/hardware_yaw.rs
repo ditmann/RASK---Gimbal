@@ -20,6 +20,7 @@ const PULSE_HIGH_TIME: Duration =
 const DIRECTION_SETUP_TIME: Duration =
     Duration::from_micros(100);
 
+
 pub struct HardwareYaw {
     pul: OutputPin,
     dir: OutputPin,
@@ -28,10 +29,13 @@ pub struct HardwareYaw {
     target_steps: i64,
 
     previous_direction: Option<bool>,
+
+    last_input_yaw: Option<f32>,
 }
 
 impl HardwareYaw {
     pub fn new() -> Result<Self, rppal::gpio::Error> {
+
         let gpio = Gpio::new()?;
 
         let pul = gpio.get(STEP_PIN)?.into_output_low();
@@ -43,6 +47,7 @@ impl HardwareYaw {
             current_steps: 0,
             target_steps: 0,
             previous_direction: None,
+            last_input_yaw: None,
         })
     }
 
@@ -72,7 +77,30 @@ impl HardwareYaw {
         }
 
         self.target_steps = self.current_steps + difference;
+
+
+        const MAX_YAW_JUMP_DEG: f32 = 25.0;
+
+        if let Some(previous_yaw) = self.last_input_yaw {
+            let delta = (angle - previous_yaw + 180.0)
+                .rem_euclid(360.0) - 180.0;
+
+            if delta.abs() > MAX_YAW_JUMP_DEG {
+                eprintln!(
+                    "VR yaw jump rejected: {:.1} -> {:.1} degrees",
+                    previous_yaw,
+                    angle
+                );
+
+                self.stop();
+                return;
+            }
+        }
+
+        self.last_input_yaw = Some(angle);
+
     }
+
 
 
     pub fn is_moving(&self) -> bool {
