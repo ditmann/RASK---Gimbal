@@ -46,20 +46,34 @@ impl HardwareYaw {
         })
     }
 
+
     pub fn set_target_angle(&mut self, angle: f32) {
-        // Reject invalid values
         if !angle.is_finite() {
             return;
         }
 
-        // Convert yaw angle to motor steps
-        let steps =
-            ((angle / 360.0) * STEPS_PER_REV).round() as i64;
+        let steps_per_rev = STEPS_PER_REV.round() as i64;
 
-        // Restrict movement during testing
-        // self.target_steps = steps.clamp(-MAX_TEST_STEPS, MAX_TEST_STEPS, );
-        self.target_steps = steps;
+        let wrapped_angle = angle.rem_euclid(360.0);
+
+        let target_step =
+            ((wrapped_angle / 360.0) * STEPS_PER_REV).round() as i64;
+
+        let target_step = target_step.rem_euclid(steps_per_rev);
+
+        let current_step =
+            self.current_steps.rem_euclid(steps_per_rev);
+
+        let mut difference =
+            (target_step - current_step).rem_euclid(steps_per_rev);
+
+        if difference > steps_per_rev / 2 {
+            difference -= steps_per_rev;
+        }
+
+        self.target_steps = self.current_steps + difference;
     }
+
 
     pub fn is_moving(&self) -> bool {
         self.current_steps != self.target_steps
