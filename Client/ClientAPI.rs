@@ -30,7 +30,7 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
     let destination: SocketAddr =
-        "10.57.51.53:5000".parse().unwrap();
+        "10.219.103.53:5000".parse().unwrap();
 
     socket.set_nonblocking(true).unwrap();
 
