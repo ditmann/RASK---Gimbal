@@ -10,7 +10,7 @@ impl MatrixToDegrees {
         let value10 = matrix[1][0];
         let value20 = matrix[2][0];
         let value11 = matrix[1][1];
-        let value21 = matrix[2][1];
+        let value12 = matrix[1][2];
 
 
         //println!("value00: {value00}");
@@ -21,7 +21,7 @@ impl MatrixToDegrees {
 
         let roll = (value10).asin().to_degrees();
         let yaw = (-value20).atan2(value00).to_degrees();
-        let pitch = (-value21).atan2(value11).to_degrees();
+        let pitch = (-value12).atan2(value11).to_degrees();
 
         //let yaw = (-value20/value00).atan().to_degrees();
         //let pitch = (-value21/value11).atan().to_degrees();
@@ -29,6 +29,8 @@ impl MatrixToDegrees {
         println!("yaw_deg: {yaw}");
         println!("pitch_deg: {pitch}");
         println!("roll_deg: {roll}");
+
+
 
         vec![yaw,pitch,roll]
     }
