@@ -10,7 +10,7 @@ const DIR_PIN: u8 = 23;
 const STEPS_PER_REV: f32 = 400.0;
 
 // Temporary small movement range for testing
-const MAX_TEST_STEPS: i64 = 10;
+const MAX_TEST_STEPS: i64 = 1000;
 
 const PULSE_HIGH_TIME: Duration =
     Duration::from_micros(100);

@@ -11,7 +11,7 @@ const DIR_PIN: u8 = 27;
 const STEPS_PER_REV: f32 = 400.0;
 
 // Temporary movement limit for testing
-const MAX_TEST_STEPS: i64 = 100;
+const MAX_TEST_STEPS: i64 = 1000;
 
 // STEP and DIR signal timing
 const PULSE_HIGH_TIME: Duration =
