@@ -52,33 +52,13 @@ impl HardwareYaw {
     }
 
 
+
     pub fn set_target_angle(&mut self, angle: f32) {
         if !angle.is_finite() {
             return;
         }
 
-        let steps_per_rev = STEPS_PER_REV.round() as i64;
-
-        let wrapped_angle = angle.rem_euclid(360.0);
-
-        let target_step =
-            ((wrapped_angle / 360.0) * STEPS_PER_REV).round() as i64;
-
-        let target_step = target_step.rem_euclid(steps_per_rev);
-
-        let current_step =
-            self.current_steps.rem_euclid(steps_per_rev);
-
-        let mut difference =
-            (target_step - current_step).rem_euclid(steps_per_rev);
-
-        if difference > steps_per_rev / 2 {
-            difference -= steps_per_rev;
-        }
-
-        self.target_steps = self.current_steps + difference;
-
-
+        // Reject sudden VR yaw jumps
         const MAX_YAW_JUMP_DEG: f32 = 25.0;
 
         if let Some(previous_yaw) = self.last_input_yaw {
@@ -87,7 +67,7 @@ impl HardwareYaw {
 
             if delta.abs() > MAX_YAW_JUMP_DEG {
                 eprintln!(
-                    "VR yaw jump rejected: {:.1} -> {:.1} degrees",
+                    "VR yaw jump rejected: {:.1} -> {:.1}",
                     previous_yaw,
                     angle
                 );
@@ -99,6 +79,31 @@ impl HardwareYaw {
 
         self.last_input_yaw = Some(angle);
 
+        // Calculate shortest direction around 360 degrees
+        let steps_per_rev = STEPS_PER_REV.round() as i64;
+
+        let wrapped_angle = angle.rem_euclid(360.0);
+
+        let target_step =
+            ((wrapped_angle / 360.0) * STEPS_PER_REV).round() as i64;
+
+        let target_step =
+            target_step.rem_euclid(steps_per_rev);
+
+        let current_step =
+            self.current_steps.rem_euclid(steps_per_rev);
+
+        let mut difference =
+            (target_step - current_step).rem_euclid(steps_per_rev);
+
+        if difference > steps_per_rev / 2 {
+            difference -= steps_per_rev;
+        }
+
+        // Apply the temporary test limit
+        self.target_steps =
+            (self.current_steps + difference)
+                .clamp(-MAX_TEST_STEPS, MAX_TEST_STEPS);
     }
 
 
