@@ -7,11 +7,8 @@ use std::time::Duration;
 const STEP_PIN: u8 = 17;
 const DIR_PIN: u8 = 27;
 
-// Must match the DM332T microstepping configuration
+// Must match the DM542T microstepping configuration
 const STEPS_PER_REV: f32 = 400.0;
-
-// Temporary movement limit for testing
-const MAX_TEST_STEPS: i64 = 1000;
 
 // STEP and DIR signal timing
 const PULSE_HIGH_TIME: Duration =
@@ -29,13 +26,11 @@ pub struct HardwareYaw {
     target_steps: i64,
 
     previous_direction: Option<bool>,
-
-    last_input_yaw: Option<f32>,
 }
+
 
 impl HardwareYaw {
     pub fn new() -> Result<Self, rppal::gpio::Error> {
-
         let gpio = Gpio::new()?;
 
         let pul = gpio.get(STEP_PIN)?.into_output_low();
@@ -47,52 +42,34 @@ impl HardwareYaw {
             current_steps: 0,
             target_steps: 0,
             previous_direction: None,
-            last_input_yaw: None,
         })
     }
 
 
-
     pub fn set_target_angle(&mut self, angle: f32) {
+        // Ignore invalid numbers
         if !angle.is_finite() {
             return;
         }
 
-        // Reject sudden VR yaw jumps
-        const MAX_YAW_JUMP_DEG: f32 = 25.0;
-
-        if let Some(previous_yaw) = self.last_input_yaw {
-            let delta = (angle - previous_yaw + 180.0)
-                .rem_euclid(360.0) - 180.0;
-
-            if delta.abs() > MAX_YAW_JUMP_DEG {
-                eprintln!(
-                    "VR yaw jump rejected: {:.1} -> {:.1}",
-                    previous_yaw,
-                    angle
-                );
-
-                self.stop();
-                return;
-            }
-        }
-
-        self.last_input_yaw = Some(angle);
-
-        // Calculate shortest direction around 360 degrees
+        // Number of steps in one full revolution
         let steps_per_rev = STEPS_PER_REV.round() as i64;
 
+        // Convert angle into 0-360 degrees
         let wrapped_angle = angle.rem_euclid(360.0);
 
+        // Convert angle into steps
         let target_step =
             ((wrapped_angle / 360.0) * STEPS_PER_REV).round() as i64;
 
         let target_step =
             target_step.rem_euclid(steps_per_rev);
 
+        // Current position within one revolution
         let current_step =
             self.current_steps.rem_euclid(steps_per_rev);
 
+        // Calculate shortest direction to target
         let mut difference =
             (target_step - current_step).rem_euclid(steps_per_rev);
 
@@ -100,17 +77,15 @@ impl HardwareYaw {
             difference -= steps_per_rev;
         }
 
-        // Apply the temporary test limit
-        self.target_steps =
-            (self.current_steps + difference)
-                .clamp(-MAX_TEST_STEPS, MAX_TEST_STEPS);
+        // Set target
+        self.target_steps = self.current_steps + difference;
     }
-
 
 
     pub fn is_moving(&self) -> bool {
         self.current_steps != self.target_steps
     }
+
 
     pub fn update(&mut self, _dt_seconds: f32) {
         let difference =
@@ -121,6 +96,7 @@ impl HardwareYaw {
             return;
         }
 
+        // Determine movement direction
         let forward = difference > 0;
 
         // Change DIR only when necessary
@@ -150,11 +126,13 @@ impl HardwareYaw {
         }
     }
 
+
     pub fn stop(&mut self) {
-        // Stop at the current commanded position
+        // Stop at current commanded position
         self.target_steps = self.current_steps;
         self.pul.set_low();
     }
+
 
     pub fn status(&self) -> String {
         format!(

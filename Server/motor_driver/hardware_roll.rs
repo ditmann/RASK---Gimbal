@@ -1,16 +1,13 @@
+
 use rppal::gpio::{Gpio, OutputPin};
 use std::thread;
 use std::time::Duration;
 
 // Roll GPIO pins (BCM numbering)
-const STEP_PIN: u8 = 24;
-const DIR_PIN: u8 = 25;
-
+const STEP_PIN: u8 = 22;
+const DIR_PIN: u8 = 23;
 // Must match DM542T microstepping settings
 const STEPS_PER_REV: f32 = 400.0;
-
-// Temporary small movement range for testing
-const MAX_TEST_STEPS: i64 = 1000;
 
 const PULSE_HIGH_TIME: Duration =
     Duration::from_micros(100);
@@ -52,8 +49,7 @@ impl HardwareRoll {
         let steps =
             ((angle / 360.0) * STEPS_PER_REV).round() as i64;
 
-        self.target_steps =
-            steps.clamp(-MAX_TEST_STEPS, MAX_TEST_STEPS);
+        self.target_steps = steps;
     }
 
     pub fn is_moving(&self) -> bool {
