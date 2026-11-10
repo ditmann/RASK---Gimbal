@@ -1,6 +1,6 @@
 #[derive(Clone, Copy, Debug)]
 pub struct Orientation {
-    pub yaw: f32,
-    pub pitch: f32,
-    pub roll: f32,
+    pub yaw: i32,
+    pub pitch: i32,
+    pub roll: i32,
 }
