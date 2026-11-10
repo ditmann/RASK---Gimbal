@@ -7,7 +7,7 @@ use std::time::Duration;
 const STEP_PIN: u8 = 24;
 const DIR_PIN: u8 = 25;
 // Must match DM542T microstepping settings
-const STEPS_PER_REV: f32 = 400.0;
+const STEPS_PER_REV: i32 = 400;
 
 const PULSE_HIGH_TIME: Duration =
     Duration::from_micros(100);
@@ -19,8 +19,8 @@ pub struct HardwarePitch {
     pul: OutputPin,
     dir: OutputPin,
 
-    current_steps: i64,
-    target_steps: i64,
+    current_steps: i32,
+    target_steps: i32,
 
     previous_direction: Option<bool>,
 }
@@ -41,14 +41,7 @@ impl HardwarePitch {
         })
     }
 
-    pub fn set_target_angle(&mut self, angle: f32) {
-        if !angle.is_finite() {
-            return;
-        }
-
-        let steps =
-            ((angle / 360.0) * STEPS_PER_REV).round() as i64;
-
+    pub fn set_target_step(&mut self, steps: i32) {
         self.target_steps = steps;
     }
 

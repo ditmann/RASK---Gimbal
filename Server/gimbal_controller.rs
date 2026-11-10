@@ -36,9 +36,9 @@ impl GimbalController {
     pub fn set_target(&mut self, orientation: Orientation) {
         self.target = Some(orientation);
 
-        self.yaw_motor.set_target_angle(orientation.yaw);
-        self.pitch_motor.set_target_angle(orientation.pitch);
-        self.roll_motor.set_target_angle(orientation.roll);
+        self.yaw_motor.set_target_step(orientation.yaw);
+        self.pitch_motor.set_target_step(orientation.pitch);
+        self.roll_motor.set_target_step(orientation.roll);
     }
 
     pub fn update(&mut self, dt_seconds: f32) {

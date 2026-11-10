@@ -8,7 +8,7 @@ const STEP_PIN: u8 = 17;
 const DIR_PIN: u8 = 27;
 
 // Must match the DM542T microstepping configuration
-const STEPS_PER_REV: f32 = 400.0;
+const STEPS_PER_REV: i32 = 400;
 
 // STEP and DIR signal timing
 const PULSE_HIGH_TIME: Duration =
@@ -22,8 +22,8 @@ pub struct HardwareYaw {
     pul: OutputPin,
     dir: OutputPin,
 
-    current_steps: i64,
-    target_steps: i64,
+    current_steps: i32,
+    target_steps: i32,
 
     previous_direction: Option<bool>,
 }
@@ -46,35 +46,26 @@ impl HardwareYaw {
     }
 
 
-    pub fn set_target_angle(&mut self, angle: f32) {
+    pub fn set_target_step(&mut self, steps: i32) {
         // Ignore invalid numbers
-        if !angle.is_finite() {
+        if !steps.is_finite() {
             return;
         }
 
-        // Number of steps in one full revolution
-        let steps_per_rev = STEPS_PER_REV.round() as i64;
-
-        // Convert angle into 0-360 degrees
-        let wrapped_angle = angle.rem_euclid(360.0);
-
-        // Convert angle into steps
+        // Target position within one revolution
         let target_step =
-            ((wrapped_angle / 360.0) * STEPS_PER_REV).round() as i64;
-
-        let target_step =
-            target_step.rem_euclid(steps_per_rev);
+            (steps.rem_euclid(STEPS_PER_REV));
 
         // Current position within one revolution
         let current_step =
-            self.current_steps.rem_euclid(steps_per_rev);
+            self.current_steps.rem_euclid(STEPS_PER_REV);
 
         // Calculate shortest direction to target
         let mut difference =
-            (target_step - current_step).rem_euclid(steps_per_rev);
+            (target_step - current_step).rem_euclid(STEPS_PER_REV);
 
-        if difference > steps_per_rev / 2 {
-            difference -= steps_per_rev;
+        if difference > STEPS_PER_REV / 2 {
+            difference -= STEPS_PER_REV;
         }
 
         // Set target
