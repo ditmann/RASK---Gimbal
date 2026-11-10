@@ -15,25 +15,17 @@ impl OrientationPacket {
             bytes[0..8].try_into().ok()?
         );
 
-        let yaw = f32::from_le_bytes(
+        let yaw = i32::from_le_bytes(
             bytes[8..12].try_into().ok()?
         );
 
-        let pitch = f32::from_le_bytes(
+        let pitch = i32::from_le_bytes(
             bytes[12..16].try_into().ok()?
         );
 
-        let roll = f32::from_le_bytes(
+        let roll = i32::from_le_bytes(
             bytes[16..20].try_into().ok()?
         );
-
-        if !yaw.is_finite()
-            || !pitch.is_finite()
-            || !roll.is_finite()
-        {
-            return None;
-        }
-
         Some(Self {
             millis,
             orientation: Orientation {
