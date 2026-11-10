@@ -47,11 +47,6 @@ impl HardwareYaw {
 
 
     pub fn set_target_step(&mut self, steps: i32) {
-        // Ignore invalid numbers
-        if !steps.is_finite() {
-            return;
-        }
-
         // Target position within one revolution
         let target_step =
             (steps.rem_euclid(STEPS_PER_REV));
