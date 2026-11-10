@@ -1,10 +1,14 @@
 mod RotationMath;
 mod vr;
-use std::io::{self, ErrorKind};
+
+use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use std::time::{Duration, Instant};
 use crate::RotationMath::{matrix_to_yaw_pitch_roll, degrees_to_steps};
+
+const STEP_DEADZONE: i32 = 5;
+const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(100);
 
 fn send_orientation(
     socket: &UdpSocket,
@@ -34,13 +38,10 @@ fn main() {
 
     let start = Instant::now();
 
-    let mut last_status: Option<Instant> = None;
-    let mut timeout_reported = false;
-
-    let mut buffer = [0u8; 16];
+    let mut last_sent_steps: Option<[i32; 3]> = None;
+    let mut last_sent_at: Option<Instant> = None;
 
     let vr = vr::Vr::wait_for_steamvr();
-
 
     loop {
         // Get elapsed time
@@ -55,67 +56,55 @@ fn main() {
         };
 
         //yaw will be 0 pitch 1 roll 2
-        let _yaw_pitch_roll_steps: Vec<i32> = degrees_to_steps(matrix_to_yaw_pitch_roll(matrix));
+        let _yaw_pitch_roll_steps: Vec<i32> =
+            degrees_to_steps(matrix_to_yaw_pitch_roll(matrix));
+
         let _yaw: i32 = _yaw_pitch_roll_steps[0];
         let _pitch: i32 = _yaw_pitch_roll_steps[1];
         let _roll: i32 = _yaw_pitch_roll_steps[2];
 
-        // Validate before sending
+        let current_steps = [_yaw, _pitch, _roll];
+        let mut filtered_steps = current_steps;
 
-        match send_orientation(
-            &socket,
-            destination,
-            _millis,
-            _yaw,
-            _pitch,
-            _roll,
-        ) {
-            Ok(_) => {
-                println!(
-                    "Sent {_millis}ms | Y:{_yaw:.2} P:{_pitch:.2} R:{_roll:.2}"
-                );
-            }
-
-            Err(error) => {
-                println!("Send error: {error}");
+        if let Some(last) = last_sent_steps {
+            for i in 0..3 {
+                if (current_steps[i] - last[i]).abs() <= STEP_DEADZONE {
+                    filtered_steps[i] = last[i];
+                }
             }
         }
 
+        let changed = last_sent_steps != Some(filtered_steps);
 
-        match socket.recv_from(&mut buffer) {
-            Ok((size, address))
-            if address == destination
-                && &buffer[..size] == b"OK" =>
-                {
-                    if last_status.is_none() || timeout_reported {
-                        println!("Server connected!");
-                    }
+        let keepalive = last_sent_at.map_or(true, |time| {
+            time.elapsed() >= KEEPALIVE_INTERVAL
+        });
 
-                    last_status = Some(Instant::now());
-                    timeout_reported = false;
+        if changed || keepalive {
+            match send_orientation(
+                &socket,
+                destination,
+                _millis,
+                filtered_steps[0],
+                filtered_steps[1],
+                filtered_steps[2],
+            ) {
+                Ok(_) => {
+                    last_sent_steps = Some(filtered_steps);
+                    last_sent_at = Some(Instant::now());
+
+                    println!(
+                        "Sent {_millis}ms | Y:{} P:{} R:{}",
+                        filtered_steps[0],
+                        filtered_steps[1],
+                        filtered_steps[2]
+                    );
                 }
 
-            Ok(_) => {
-                // Ignore unknown responses
+                Err(error) => {
+                    println!("Send error: {error}");
+                }
             }
-
-            Err(error)
-            if error.kind() == ErrorKind::WouldBlock
-                || error.kind() == ErrorKind::ConnectionReset =>
-                {}
-
-            Err(error) => {
-                println!("Status receive error: {error}");
-            }
-        }
-
-        // Check server connection
-        if last_status.unwrap_or(start).elapsed()
-            >= Duration::from_secs(3)
-            && !timeout_reported
-        {
-            println!("Server not responding!");
-            timeout_reported = true;
         }
 
         // Approximately 50 updates per second
