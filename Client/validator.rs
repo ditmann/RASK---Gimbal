@@ -1,7 +1,8 @@
+
 pub fn is_valid_orientation(
-    yaw: f32,
-    pitch: f32,
-    roll: f32,
+    yaw: i32,
+    pitch: i32,
+    roll: i32,
 ) -> bool {
     yaw.is_finite()
         && pitch.is_finite()

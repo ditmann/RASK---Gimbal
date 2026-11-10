@@ -1,20 +1,19 @@
-mod validator;
 mod vr;
-mod matrixToDegrees;
+mod RotationMath;
 
 use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::matrixToDegrees::MatrixToDegrees;
+use crate::RotationMath::{matrix_to_yaw_pitch_roll, degrees_to_steps};
 
 fn send_orientation(
     socket: &UdpSocket,
     destination: SocketAddr,
     millis: u64,
-    yaw: f32,
-    pitch: f32,
-    roll: f32,
+    yaw: i32,
+    pitch: i32,
+    roll: i32,
 ) -> io::Result<usize> {
     let mut packet = [0u8; 20];
 
@@ -30,7 +29,7 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
     let destination: SocketAddr =
-        "10.219.103.53:5000".parse().unwrap();
+        "172.31.212.53:5000".parse().unwrap();
 
     socket.set_nonblocking(true).unwrap();
 
@@ -48,8 +47,8 @@ fn main() {
         // Get elapsed time
         let elapsed = start.elapsed();
 
-        let millis = elapsed.as_millis() as u64;
-        let time = elapsed.as_secs_f32();
+        let _millis = elapsed.as_millis() as u64;
+        let _time = elapsed.as_secs_f32();
 
         let Some(matrix) = vr.headset_matrix() else {
             thread::sleep(Duration::from_millis(20));
@@ -57,13 +56,13 @@ fn main() {
         };
 
         //yaw will be 0 pitch 1 roll 2
-        let _yaw_pitch_roll: Vec<f32> = MatrixToDegrees::matrix_to_yaw_pitch_roll(matrix);
-        let yaw: f32 = _yaw_pitch_roll[0];
-        let pitch: f32 = _yaw_pitch_roll[1];
-        let roll: f32 = _yaw_pitch_roll[2];
+        let _yaw_pitch_roll_steps: Vec<i32> = degrees_to_steps(matrix_to_yaw_pitch_roll(matrix));
+        let _yaw: i32 = _yaw_pitch_roll_steps[0];
+        let _pitch: i32 = _yaw_pitch_roll_steps[1];
+        let _roll: i32 = _yaw_pitch_roll_steps[2];
 
         // Validate before sending
-        if validator::is_valid_orientation(yaw, pitch, roll) {
+       /* if validator::is_valid_orientation(yaw, pitch, roll) {
             match send_orientation(
                 &socket,
                 destination,
@@ -84,7 +83,7 @@ fn main() {
             }
         } else {
             println!("Invalid orientation. Not sent.");
-        }
+        } */
 
         match socket.recv_from(&mut buffer) {
             Ok((size, address))
