@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::RotationMath::{matrix_to_yaw_pitch_roll, degrees_to_steps};
 
-const STEP_DEADZONE: i32 = 5;
+const STEP_DEADZONE: i32 = 1;
 const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(100);
 
 fn send_orientation(
@@ -32,7 +32,7 @@ fn main() {
     let socket = UdpSocket::bind("0.0.0.0:0").unwrap();
 
     let destination: SocketAddr =
-        "172.31.212.53:5000".parse().unwrap();
+        "10.219.103.53:5000".parse().unwrap();
 
     socket.set_nonblocking(true).unwrap();
 
@@ -59,7 +59,7 @@ fn main() {
         let _yaw_pitch_roll_steps: Vec<i32> =
             degrees_to_steps(matrix_to_yaw_pitch_roll(matrix));
 
-        let _yaw: i32 = _yaw_pitch_roll_steps[0];
+        let _yaw: i32 = _yaw_pitch_roll_steps[0] * 2;
         let _pitch: i32 = _yaw_pitch_roll_steps[1];
         let _roll: i32 = _yaw_pitch_roll_steps[2];
 
