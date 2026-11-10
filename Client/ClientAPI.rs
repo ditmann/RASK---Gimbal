@@ -1,6 +1,5 @@
-mod vr;
 mod RotationMath;
-
+mod vr;
 use std::io::{self, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
 use std::thread;
@@ -62,28 +61,26 @@ fn main() {
         let _roll: i32 = _yaw_pitch_roll_steps[2];
 
         // Validate before sending
-       /* if validator::is_valid_orientation(yaw, pitch, roll) {
-            match send_orientation(
-                &socket,
-                destination,
-                millis,
-                yaw,
-                pitch,
-                roll,
-            ) {
-                Ok(_) => {
-                    println!(
-                        "Sent {millis}ms | Y:{yaw:.2} P:{pitch:.2} R:{roll:.2}"
-                    );
-                }
 
-                Err(error) => {
-                    println!("Send error: {error}");
-                }
+        match send_orientation(
+            &socket,
+            destination,
+            _millis,
+            _yaw,
+            _pitch,
+            _roll,
+        ) {
+            Ok(_) => {
+                println!(
+                    "Sent {_millis}ms | Y:{_yaw:.2} P:{_pitch:.2} R:{_roll:.2}"
+                );
             }
-        } else {
-            println!("Invalid orientation. Not sent.");
-        } */
+
+            Err(error) => {
+                println!("Send error: {error}");
+            }
+        }
+
 
         match socket.recv_from(&mut buffer) {
             Ok((size, address))
@@ -105,8 +102,7 @@ fn main() {
             Err(error)
             if error.kind() == ErrorKind::WouldBlock
                 || error.kind() == ErrorKind::ConnectionReset =>
-                {
-                }
+                {}
 
             Err(error) => {
                 println!("Status receive error: {error}");
