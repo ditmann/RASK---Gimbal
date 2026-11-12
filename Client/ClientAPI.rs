@@ -59,7 +59,7 @@ fn main() {
         let _yaw_pitch_roll_steps: Vec<i32> =
             degrees_to_steps(matrix_to_yaw_pitch_roll(matrix));
 
-        let _yaw: i32 = _yaw_pitch_roll_steps[0] * 2;
+        let _yaw: i32 = _yaw_pitch_roll_steps[0];
         let _pitch: i32 = _yaw_pitch_roll_steps[1];
         let _roll: i32 = _yaw_pitch_roll_steps[2];
 

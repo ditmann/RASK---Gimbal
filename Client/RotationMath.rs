@@ -2,8 +2,10 @@ pub(crate) fn degrees_to_steps(degrees: Vec<f32>) -> Vec<i32> {
     const STEPS_PER_REV_YAW: f32 = 400.0;
     const STEPS_PER_REV_PITCH: f32 = 400.0;
     const STEPS_PER_REV_ROLL: f32 = 400.0;
+    
+    const YAW_GEAR_RATIO: f32 = 3.0;
 
-    let yaw: i32 = ((degrees[0] / 360.0) * STEPS_PER_REV_YAW).round() as i32;
+    let yaw: i32 = (((degrees[0] / 360.0) * STEPS_PER_REV_YAW) * YAW_GEAR_RATIO).round() as i32;
     let pitch: i32 = ((degrees[1]  / 360.0) * STEPS_PER_REV_PITCH).round() as i32;
     let roll: i32 = ((degrees[2]  / 360.0) * STEPS_PER_REV_ROLL).round() as i32;
 
