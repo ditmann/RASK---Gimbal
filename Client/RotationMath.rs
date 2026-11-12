@@ -2,7 +2,7 @@ pub(crate) fn degrees_to_steps(degrees: Vec<f32>) -> Vec<i32> {
     const STEPS_PER_REV_YAW: f32 = 400.0;
     const STEPS_PER_REV_PITCH: f32 = 400.0;
     const STEPS_PER_REV_ROLL: f32 = 400.0;
-    
+
     const YAW_GEAR_RATIO: f32 = 3.0;
 
     let yaw: i32 = (((degrees[0] / 360.0) * STEPS_PER_REV_YAW) * YAW_GEAR_RATIO).round() as i32;
@@ -31,7 +31,7 @@ pub(crate) fn matrix_to_yaw_pitch_roll(matrix: [[f32; 4]; 3]) -> Vec<f32> {
 
     let roll = (value10).asin().to_degrees();
     let yaw = (-value20).atan2(value00).to_degrees();
-    let pitch = (-value12).atan2(value11).to_degrees();
+    let pitch = (value12).atan2(value11).to_degrees();
 
     //let yaw = (-value20/value00).atan().to_degrees();
     //let pitch = (-value21/value11).atan().to_degrees();

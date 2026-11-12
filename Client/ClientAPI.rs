@@ -7,7 +7,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use crate::RotationMath::{matrix_to_yaw_pitch_roll, degrees_to_steps};
 
-const STEP_DEADZONE: i32 = 1;
+const STEP_DEADZONE: i32 = 2;
 const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(100);
 
 fn send_orientation(
