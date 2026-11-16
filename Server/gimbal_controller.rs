@@ -41,16 +41,34 @@ impl GimbalController {
         self.roll_motor.set_target_step(orientation.roll);
     }
 
-    pub fn update(&mut self, dt_seconds: f32) {
+    pub fn update_yaw(&mut self, dt_seconds: f32) {
         self.yaw_motor.update(dt_seconds);
+    }
+
+    pub fn update_pitch(&mut self, dt_seconds: f32) {
         self.pitch_motor.update(dt_seconds);
+    }
+
+    pub fn update_roll(&mut self, dt_seconds: f32) {
         self.roll_motor.update(dt_seconds);
     }
 
-    pub fn is_moving(&self) -> bool {
+    pub fn yaw_is_moving(&self) -> bool {
         self.yaw_motor.is_moving()
-            || self.pitch_motor.is_moving()
-            || self.roll_motor.is_moving()
+    }
+
+    pub fn pitch_is_moving(&self) -> bool {
+        self.pitch_motor.is_moving()
+    }
+
+    pub fn roll_is_moving(&self) -> bool {
+        self.roll_motor.is_moving()
+    }
+
+    pub fn is_moving(&self) -> bool {
+        self.yaw_is_moving()
+            || self.pitch_is_moving()
+            || self.roll_is_moving()
     }
 
     pub fn clear_target(&mut self) {
@@ -66,7 +84,7 @@ impl GimbalController {
             "{} | {} | {}",
             self.yaw_motor.status(),
             self.pitch_motor.status(),
-            self.roll_motor.status(),
+            self.roll_motor.status()
         );
     }
 }

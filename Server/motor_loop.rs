@@ -4,23 +4,27 @@ use std::sync::mpsc::{
     RecvTimeoutError,
     TryRecvError,
 };
-
 use std::time::{Duration, Instant};
 
 use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
-// Maximum requested step rate
-const MAX_PULSES_PER_SECOND: u64 = 400;
+const YAW_PULSES_PER_SECOND: u64 = 1200;
+const PITCH_PULSES_PER_SECOND: u64 = 400;
+const ROLL_PULSES_PER_SECOND: u64 = 400;
 
-const STEP_INTERVAL: Duration =
-    Duration::from_micros(
-        1_000_000 / MAX_PULSES_PER_SECOND
-    );
+const YAW_STEP_INTERVAL: Duration =
+    Duration::from_micros(1_000_000 / YAW_PULSES_PER_SECOND);
 
-// Stop movement if fresh targets stop arriving
+const PITCH_STEP_INTERVAL: Duration =
+    Duration::from_micros(1_000_000 / PITCH_PULSES_PER_SECOND);
+
+const ROLL_STEP_INTERVAL: Duration =
+    Duration::from_micros(1_000_000 / ROLL_PULSES_PER_SECOND);
+
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
+
 
 fn collect_command(
     command: MovementCommand,
@@ -45,12 +49,16 @@ pub fn run(receiver: Receiver<MovementCommand>) {
     let mut controller = GimbalController::new();
 
     let mut last_target_at: Option<Instant> = None;
-    let mut last_update = Instant::now();
     let mut last_print = Instant::now();
 
-    let mut next_step_at = Instant::now();
+    let mut next_yaw_step_at = Instant::now();
+    let mut next_pitch_step_at = Instant::now();
+    let mut next_roll_step_at = Instant::now();
 
-    // Stores a command received while waiting
+    let mut last_yaw_update = Instant::now();
+    let mut last_pitch_update = Instant::now();
+    let mut last_roll_update = Instant::now();
+
     let mut pending_command: Option<MovementCommand> = None;
 
     println!("Motor thread started.");
@@ -59,7 +67,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
         let mut latest_target = None;
         let mut stop_requested = false;
 
-        // Process the command that woke us up
         if let Some(command) = pending_command.take() {
             collect_command(
                 command,
@@ -68,7 +75,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             );
         }
 
-        // Drain any additional waiting commands
         loop {
             match receiver.try_recv() {
                 Ok(command) => {
@@ -79,9 +85,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                     );
                 }
 
-                Err(TryRecvError::Empty) => {
-                    break;
-                }
+                Err(TryRecvError::Empty) => break,
 
                 Err(TryRecvError::Disconnected) => {
                     controller.clear_target();
@@ -90,27 +94,38 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
         }
 
-        // Apply Stop or the latest target
         if stop_requested {
             controller.clear_target();
             last_target_at = None;
         } else if let Some(orientation) = latest_target {
-            let was_moving = controller.is_moving();
+            let yaw_was_moving = controller.yaw_is_moving();
+            let pitch_was_moving = controller.pitch_is_moving();
+            let roll_was_moving = controller.roll_is_moving();
 
             movement::handle_orientation(
                 &mut controller,
                 orientation,
             );
 
-            last_target_at = Some(Instant::now());
+            let now = Instant::now();
+            last_target_at = Some(now);
 
-            // Start immediately if previously idle
-            if !was_moving {
-                next_step_at = Instant::now();
+            if !yaw_was_moving && controller.yaw_is_moving() {
+                next_yaw_step_at = now;
+                last_yaw_update = now;
+            }
+
+            if !pitch_was_moving && controller.pitch_is_moving() {
+                next_pitch_step_at = now;
+                last_pitch_update = now;
+            }
+
+            if !roll_was_moving && controller.roll_is_moving() {
+                next_roll_step_at = now;
+                last_roll_update = now;
             }
         }
 
-        // Check communication watchdog
         if let Some(last) = last_target_at {
             if last.elapsed() >= COMMAND_TIMEOUT {
                 controller.clear_target();
@@ -120,26 +135,51 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
         }
 
-        // Generate a STEP pulse when due
-        if last_target_at.is_some() && controller.is_moving() {
+        if last_target_at.is_some() {
             let now = Instant::now();
+            let mut stepped = false;
 
-            if now >= next_step_at {
-                let dt_seconds =
-                    now.duration_since(last_update).as_secs_f32();
+            if controller.yaw_is_moving()
+                && now >= next_yaw_step_at
+            {
+                let dt = now.duration_since(last_yaw_update)
+                    .as_secs_f32();
 
-                last_update = now;
+                controller.update_yaw(dt);
 
-                controller.update(dt_seconds);
+                last_yaw_update = now;
+                next_yaw_step_at = now + YAW_STEP_INTERVAL;
+                stepped = true;
+            }
 
-                // Schedule the next pulse from the
-                // start of this pulse, not from the
-                // previous deadline.
-                next_step_at = now + STEP_INTERVAL;
+            if controller.pitch_is_moving()
+                && now >= next_pitch_step_at
+            {
+                let dt = now.duration_since(last_pitch_update)
+                    .as_secs_f32();
 
-                if last_print.elapsed()
-                    >= Duration::from_millis(1)
-                {
+                controller.update_pitch(dt);
+
+                last_pitch_update = now;
+                next_pitch_step_at = now + PITCH_STEP_INTERVAL;
+                stepped = true;
+            }
+
+            if controller.roll_is_moving()
+                && now >= next_roll_step_at
+            {
+                let dt = now.duration_since(last_roll_update)
+                    .as_secs_f32();
+
+                controller.update_roll(dt);
+
+                last_roll_update = now;
+                next_roll_step_at = now + ROLL_STEP_INTERVAL;
+                stepped = true;
+            }
+
+            if stepped {
+                if last_print.elapsed() >= Duration::from_millis(500) {
                     controller.print_status();
                     last_print = Instant::now();
                 }
@@ -148,32 +188,30 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
         }
 
-        // Calculate how long we can wait
         if let Some(last) = last_target_at {
-            let watchdog_deadline =
-                last + COMMAND_TIMEOUT;
+            let mut deadline = last + COMMAND_TIMEOUT;
 
-            let deadline = if controller.is_moving() {
-                next_step_at.min(watchdog_deadline)
-            } else {
-                watchdog_deadline
-            };
+            if controller.yaw_is_moving() {
+                deadline = deadline.min(next_yaw_step_at);
+            }
+
+            if controller.pitch_is_moving() {
+                deadline = deadline.min(next_pitch_step_at);
+            }
+
+            if controller.roll_is_moving() {
+                deadline = deadline.min(next_roll_step_at);
+            }
 
             let wait_time =
-                deadline.saturating_duration_since(
-                    Instant::now()
-                );
+                deadline.saturating_duration_since(Instant::now());
 
-            // Wake when a command arrives OR a
-            // motor/watchdog deadline is reached.
             match receiver.recv_timeout(wait_time) {
                 Ok(command) => {
                     pending_command = Some(command);
                 }
 
-                Err(RecvTimeoutError::Timeout) => {
-                    // Check deadlines again
-                }
+                Err(RecvTimeoutError::Timeout) => {}
 
                 Err(RecvTimeoutError::Disconnected) => {
                     controller.clear_target();
@@ -181,7 +219,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 }
             }
         } else {
-            // Fully idle: block until a command arrives
             match receiver.recv() {
                 Ok(command) => {
                     pending_command = Some(command);
