@@ -6,28 +6,27 @@ use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
-const YAW_MAX_PULSES_PER_SECOND: f64 = 1200.0;
+const YAW_MAX_PULSES_PER_SECOND: f64 = 1000.0;
+const PITCH_MAX_PULSES_PER_SECOND: f64 = 400.0;
+const ROLL_MAX_PULSES_PER_SECOND: f64 = 400.0;
+
 const YAW_START_PULSES_PER_SECOND: f64 = 100.0;
+const PITCH_START_PULSES_PER_SECOND: f64 = 50.0;
+const ROLL_START_PULSES_PER_SECOND: f64 = 50.0;
+
 const YAW_ACCELERATION: f64 = 5000.0;
-
-const PITCH_PULSES_PER_SECOND: u64 = 400;
-const ROLL_PULSES_PER_SECOND: u64 = 400;
-
-const PITCH_STEP_INTERVAL: Duration =
-    Duration::from_micros(1_000_000 / PITCH_PULSES_PER_SECOND);
-
-const ROLL_STEP_INTERVAL: Duration =
-    Duration::from_micros(1_000_000 / ROLL_PULSES_PER_SECOND);
+const PITCH_ACCELERATION: f64 = 1500.0;
+const ROLL_ACCELERATION: f64 = 1500.0;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
 
-struct YawRamp {
+struct MotorRamp {
     speed: f64,
     direction: Option<bool>,
     next_step_at: Instant,
 }
 
-impl YawRamp {
+impl MotorRamp {
     fn new() -> Self {
         Self {
             speed: 0.0,
@@ -42,9 +41,17 @@ impl YawRamp {
         self.next_step_at = Instant::now();
     }
 
-    fn step(&mut self, controller: &mut GimbalController) {
-        let remaining = controller.yaw_remaining_steps();
-
+    fn step<F>(
+        &mut self,
+        remaining: i64,
+        start_speed: f64,
+        max_speed: f64,
+        acceleration: f64,
+        pulse: F,
+    )
+    where
+        F: FnOnce(bool) -> i64,
+    {
         if remaining == 0 {
             self.reset();
             return;
@@ -54,54 +61,44 @@ impl YawRamp {
 
         if self.direction.is_none() {
             self.direction = Some(wanted_forward);
-            self.speed = YAW_START_PULSES_PER_SECOND;
+            self.speed = start_speed;
         }
 
         if self.direction != Some(wanted_forward)
-            && self.speed <= YAW_START_PULSES_PER_SECOND
+            && self.speed <= start_speed
         {
             self.direction = Some(wanted_forward);
         }
 
         let forward = self.direction.unwrap();
 
-        controller.pulse_yaw(forward);
+        let remaining_after = pulse(forward);
 
-        let remaining = controller.yaw_remaining_steps();
-
-        if remaining == 0 {
+        if remaining_after == 0 {
             self.reset();
             return;
         }
 
-        let stopping_distance = (
-            self.speed * self.speed
-                - YAW_START_PULSES_PER_SECOND
-                * YAW_START_PULSES_PER_SECOND
-        )
-            .max(0.0)
-            / (2.0 * YAW_ACCELERATION);
+        let stopping_distance =
+            (self.speed * self.speed - start_speed * start_speed)
+                .max(0.0)
+                / (2.0 * acceleration);
 
-        let braking = (remaining > 0) != forward
-            || (remaining.abs() as f64) <= stopping_distance + 1.0;
+        let braking =
+            (remaining_after > 0) != forward
+                || (remaining_after.abs() as f64)
+                <= stopping_distance + 1.0;
 
         if braking {
-            self.speed = (
-                self.speed * self.speed
-                    - 2.0 * YAW_ACCELERATION
-            )
-                .max(
-                    YAW_START_PULSES_PER_SECOND
-                        * YAW_START_PULSES_PER_SECOND,
-                )
-                .sqrt();
+            self.speed =
+                (self.speed * self.speed - 2.0 * acceleration)
+                    .max(start_speed * start_speed)
+                    .sqrt();
         } else {
-            self.speed = (
-                self.speed * self.speed
-                    + 2.0 * YAW_ACCELERATION
-            )
-                .sqrt()
-                .min(YAW_MAX_PULSES_PER_SECOND);
+            self.speed =
+                (self.speed * self.speed + 2.0 * acceleration)
+                    .sqrt()
+                    .min(max_speed);
         }
 
         self.next_step_at = Instant::now()
@@ -134,13 +131,9 @@ pub fn run(receiver: Receiver<MovementCommand>) {
     let mut last_target_at: Option<Instant> = None;
     let mut last_print = Instant::now();
 
-    let mut yaw = YawRamp::new();
-
-    let mut next_pitch_step_at = Instant::now();
-    let mut next_roll_step_at = Instant::now();
-
-    let mut last_pitch_update = Instant::now();
-    let mut last_roll_update = Instant::now();
+    let mut yaw = MotorRamp::new();
+    let mut pitch = MotorRamp::new();
+    let mut roll = MotorRamp::new();
 
     let mut pending_command: Option<MovementCommand> = None;
 
@@ -179,7 +172,11 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
         if stop_requested {
             controller.clear_target();
+
             yaw.reset();
+            pitch.reset();
+            roll.reset();
+
             last_target_at = None;
         } else if let Some(orientation) = latest_target {
             let yaw_was_moving = controller.yaw_is_moving();
@@ -191,28 +188,29 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 orientation,
             );
 
-            let now = Instant::now();
-            last_target_at = Some(now);
+            last_target_at = Some(Instant::now());
 
             if !yaw_was_moving || !controller.yaw_is_moving() {
                 yaw.reset();
             }
 
-            if !pitch_was_moving && controller.pitch_is_moving() {
-                next_pitch_step_at = now;
-                last_pitch_update = now;
+            if !pitch_was_moving || !controller.pitch_is_moving() {
+                pitch.reset();
             }
 
-            if !roll_was_moving && controller.roll_is_moving() {
-                next_roll_step_at = now;
-                last_roll_update = now;
+            if !roll_was_moving || !controller.roll_is_moving() {
+                roll.reset();
             }
         }
 
         if let Some(last) = last_target_at {
             if last.elapsed() >= COMMAND_TIMEOUT {
                 controller.clear_target();
+
                 yaw.reset();
+                pitch.reset();
+                roll.reset();
+
                 last_target_at = None;
 
                 println!("Motor stopped: command timeout.");
@@ -220,44 +218,61 @@ pub fn run(receiver: Receiver<MovementCommand>) {
         }
 
         if last_target_at.is_some() {
-            let now = Instant::now();
             let mut stepped = false;
 
             if controller.yaw_is_moving()
-                && now >= yaw.next_step_at
+                && Instant::now() >= yaw.next_step_at
             {
-                yaw.step(&mut controller);
+                let remaining = controller.yaw_remaining_steps();
+
+                yaw.step(
+                    remaining,
+                    YAW_START_PULSES_PER_SECOND,
+                    YAW_MAX_PULSES_PER_SECOND,
+                    YAW_ACCELERATION,
+                    |forward| {
+                        controller.pulse_yaw(forward);
+                        controller.yaw_remaining_steps()
+                    },
+                );
+
                 stepped = true;
             }
 
             if controller.pitch_is_moving()
-                && now >= next_pitch_step_at
+                && Instant::now() >= pitch.next_step_at
             {
-                let dt = now
-                    .duration_since(last_pitch_update)
-                    .as_secs_f32();
+                let remaining = controller.pitch_remaining_steps();
 
-                controller.update_pitch(dt);
-
-                last_pitch_update = now;
-                next_pitch_step_at =
-                    Instant::now() + PITCH_STEP_INTERVAL;
+                pitch.step(
+                    remaining,
+                    PITCH_START_PULSES_PER_SECOND,
+                    PITCH_MAX_PULSES_PER_SECOND,
+                    PITCH_ACCELERATION,
+                    |forward| {
+                        controller.pulse_pitch(forward);
+                        controller.pitch_remaining_steps()
+                    },
+                );
 
                 stepped = true;
             }
 
             if controller.roll_is_moving()
-                && now >= next_roll_step_at
+                && Instant::now() >= roll.next_step_at
             {
-                let dt = now
-                    .duration_since(last_roll_update)
-                    .as_secs_f32();
+                let remaining = controller.roll_remaining_steps();
 
-                controller.update_roll(dt);
-
-                last_roll_update = now;
-                next_roll_step_at =
-                    Instant::now() + ROLL_STEP_INTERVAL;
+                roll.step(
+                    remaining,
+                    ROLL_START_PULSES_PER_SECOND,
+                    ROLL_MAX_PULSES_PER_SECOND,
+                    ROLL_ACCELERATION,
+                    |forward| {
+                        controller.pulse_roll(forward);
+                        controller.roll_remaining_steps()
+                    },
+                );
 
                 stepped = true;
             }
@@ -280,11 +295,11 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
 
             if controller.pitch_is_moving() {
-                deadline = deadline.min(next_pitch_step_at);
+                deadline = deadline.min(pitch.next_step_at);
             }
 
             if controller.roll_is_moving() {
-                deadline = deadline.min(next_roll_step_at);
+                deadline = deadline.min(roll.next_step_at);
             }
 
             let wait_time =

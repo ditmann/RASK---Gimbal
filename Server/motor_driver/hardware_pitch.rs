@@ -82,6 +82,35 @@ impl HardwarePitch {
         }
     }
 
+
+    pub fn remaining_steps(&self) -> i64 {
+        self.target_steps as i64 - self.current_steps as i64
+    }
+
+    pub fn step_in_direction(&mut self, forward: bool) {
+        if self.previous_direction != Some(forward) {
+            if forward {
+                self.dir.set_high();
+            } else {
+                self.dir.set_low();
+            }
+
+            thread::sleep(DIRECTION_SETUP_TIME);
+            self.previous_direction = Some(forward);
+        }
+
+        self.pul.set_high();
+        thread::sleep(PULSE_HIGH_TIME);
+        self.pul.set_low();
+
+        if forward {
+            self.current_steps += 1;
+        } else {
+            self.current_steps -= 1;
+        }
+    }
+
+
     pub fn stop(&mut self) {
         self.target_steps = self.current_steps;
         self.pul.set_low();
