@@ -45,28 +45,33 @@ impl HardwareYaw {
         })
     }
 
-
     pub fn set_target_step(&mut self, steps: i32) {
-        // Target position within one revolution
-        let target_step =
-            steps.rem_euclid(STEPS_PER_REV);
-
-        // Current position within one revolution
-        let current_step =
-            self.current_steps.rem_euclid(STEPS_PER_REV);
-
-        // Calculate shortest direction to target
-        let mut difference =
-            (target_step - current_step).rem_euclid(STEPS_PER_REV);
-
-        if difference > STEPS_PER_REV / 2 {
-            difference -= STEPS_PER_REV;
-        }
-
-        // Set target
-        self.target_steps = self.current_steps + difference;
+        self.target_steps = steps;
     }
 
+
+    /*
+        pub fn set_target_step(&mut self, steps: i32) {
+            // Target position within one revolution
+            let target_step =
+                steps.rem_euclid(STEPS_PER_REV);
+
+            // Current position within one revolution
+            let current_step =
+                self.current_steps.rem_euclid(STEPS_PER_REV);
+
+            // Calculate shortest direction to target
+            let mut difference =
+                (target_step - current_step).rem_euclid(STEPS_PER_REV);
+
+            if difference > STEPS_PER_REV / 2 {
+                difference -= STEPS_PER_REV;
+            }
+
+            // Set target
+            self.target_steps = self.current_steps + difference;
+        }
+    */
 
     pub fn is_moving(&self) -> bool {
         self.current_steps != self.target_steps
