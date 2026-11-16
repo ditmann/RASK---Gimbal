@@ -65,6 +65,16 @@ impl GimbalController {
         self.roll_motor.is_moving()
     }
 
+
+    pub fn yaw_remaining_steps(&self) -> i64 {
+        self.yaw_motor.remaining_steps()
+    }
+
+    pub fn pulse_yaw(&mut self, forward: bool) {
+        self.yaw_motor.step_in_direction(forward);
+    }
+
+
     pub fn is_moving(&self) -> bool {
         self.yaw_is_moving()
             || self.pitch_is_moving()

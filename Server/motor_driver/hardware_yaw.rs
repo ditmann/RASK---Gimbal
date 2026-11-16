@@ -49,7 +49,7 @@ impl HardwareYaw {
     pub fn set_target_step(&mut self, steps: i32) {
         // Target position within one revolution
         let target_step =
-            (steps.rem_euclid(STEPS_PER_REV));
+            steps.rem_euclid(STEPS_PER_REV);
 
         // Current position within one revolution
         let current_step =
@@ -85,6 +85,16 @@ impl HardwareYaw {
         // Determine movement direction
         let forward = difference > 0;
 
+        self.step_in_direction(forward);
+    }
+
+
+    pub fn remaining_steps(&self) -> i64 {
+        self.target_steps as i64 - self.current_steps as i64
+    }
+
+
+    pub fn step_in_direction(&mut self, forward: bool) {
         // Change DIR only when necessary
         if self.previous_direction != Some(forward) {
             if forward {

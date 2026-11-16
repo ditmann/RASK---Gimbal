@@ -1,21 +1,17 @@
 
-use std::sync::mpsc::{
-    Receiver,
-    RecvTimeoutError,
-    TryRecvError,
-};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
 use std::time::{Duration, Instant};
 
 use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
-const YAW_PULSES_PER_SECOND: u64 = 1200;
+const YAW_MAX_PULSES_PER_SECOND: f64 = 1200.0;
+const YAW_START_PULSES_PER_SECOND: f64 = 100.0;
+const YAW_ACCELERATION: f64 = 5000.0;
+
 const PITCH_PULSES_PER_SECOND: u64 = 400;
 const ROLL_PULSES_PER_SECOND: u64 = 400;
-
-const YAW_STEP_INTERVAL: Duration =
-    Duration::from_micros(1_000_000 / YAW_PULSES_PER_SECOND);
 
 const PITCH_STEP_INTERVAL: Duration =
     Duration::from_micros(1_000_000 / PITCH_PULSES_PER_SECOND);
@@ -25,6 +21,93 @@ const ROLL_STEP_INTERVAL: Duration =
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
 
+struct YawRamp {
+    speed: f64,
+    direction: Option<bool>,
+    next_step_at: Instant,
+}
+
+impl YawRamp {
+    fn new() -> Self {
+        Self {
+            speed: 0.0,
+            direction: None,
+            next_step_at: Instant::now(),
+        }
+    }
+
+    fn reset(&mut self) {
+        self.speed = 0.0;
+        self.direction = None;
+        self.next_step_at = Instant::now();
+    }
+
+    fn step(&mut self, controller: &mut GimbalController) {
+        let remaining = controller.yaw_remaining_steps();
+
+        if remaining == 0 {
+            self.reset();
+            return;
+        }
+
+        let wanted_forward = remaining > 0;
+
+        if self.direction.is_none() {
+            self.direction = Some(wanted_forward);
+            self.speed = YAW_START_PULSES_PER_SECOND;
+        }
+
+        if self.direction != Some(wanted_forward)
+            && self.speed <= YAW_START_PULSES_PER_SECOND
+        {
+            self.direction = Some(wanted_forward);
+        }
+
+        let forward = self.direction.unwrap();
+
+        controller.pulse_yaw(forward);
+
+        let remaining = controller.yaw_remaining_steps();
+
+        if remaining == 0 {
+            self.reset();
+            return;
+        }
+
+        let stopping_distance = (
+            self.speed * self.speed
+                - YAW_START_PULSES_PER_SECOND
+                * YAW_START_PULSES_PER_SECOND
+        )
+            .max(0.0)
+            / (2.0 * YAW_ACCELERATION);
+
+        let braking = (remaining > 0) != forward
+            || (remaining.abs() as f64) <= stopping_distance + 1.0;
+
+        if braking {
+            self.speed = (
+                self.speed * self.speed
+                    - 2.0 * YAW_ACCELERATION
+            )
+                .max(
+                    YAW_START_PULSES_PER_SECOND
+                        * YAW_START_PULSES_PER_SECOND,
+                )
+                .sqrt();
+        } else {
+            self.speed = (
+                self.speed * self.speed
+                    + 2.0 * YAW_ACCELERATION
+            )
+                .sqrt()
+                .min(YAW_MAX_PULSES_PER_SECOND);
+        }
+
+        self.next_step_at = Instant::now()
+            + Duration::from_secs_f64(1.0 / self.speed);
+    }
+}
 
 fn collect_command(
     command: MovementCommand,
@@ -51,11 +134,11 @@ pub fn run(receiver: Receiver<MovementCommand>) {
     let mut last_target_at: Option<Instant> = None;
     let mut last_print = Instant::now();
 
-    let mut next_yaw_step_at = Instant::now();
+    let mut yaw = YawRamp::new();
+
     let mut next_pitch_step_at = Instant::now();
     let mut next_roll_step_at = Instant::now();
 
-    let mut last_yaw_update = Instant::now();
     let mut last_pitch_update = Instant::now();
     let mut last_roll_update = Instant::now();
 
@@ -96,6 +179,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
         if stop_requested {
             controller.clear_target();
+            yaw.reset();
             last_target_at = None;
         } else if let Some(orientation) = latest_target {
             let yaw_was_moving = controller.yaw_is_moving();
@@ -110,9 +194,8 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             let now = Instant::now();
             last_target_at = Some(now);
 
-            if !yaw_was_moving && controller.yaw_is_moving() {
-                next_yaw_step_at = now;
-                last_yaw_update = now;
+            if !yaw_was_moving || !controller.yaw_is_moving() {
+                yaw.reset();
             }
 
             if !pitch_was_moving && controller.pitch_is_moving() {
@@ -129,6 +212,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
         if let Some(last) = last_target_at {
             if last.elapsed() >= COMMAND_TIMEOUT {
                 controller.clear_target();
+                yaw.reset();
                 last_target_at = None;
 
                 println!("Motor stopped: command timeout.");
@@ -140,41 +224,41 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             let mut stepped = false;
 
             if controller.yaw_is_moving()
-                && now >= next_yaw_step_at
+                && now >= yaw.next_step_at
             {
-                let dt = now.duration_since(last_yaw_update)
-                    .as_secs_f32();
-
-                controller.update_yaw(dt);
-
-                last_yaw_update = now;
-                next_yaw_step_at = now + YAW_STEP_INTERVAL;
+                yaw.step(&mut controller);
                 stepped = true;
             }
 
             if controller.pitch_is_moving()
                 && now >= next_pitch_step_at
             {
-                let dt = now.duration_since(last_pitch_update)
+                let dt = now
+                    .duration_since(last_pitch_update)
                     .as_secs_f32();
 
                 controller.update_pitch(dt);
 
                 last_pitch_update = now;
-                next_pitch_step_at = now + PITCH_STEP_INTERVAL;
+                next_pitch_step_at =
+                    Instant::now() + PITCH_STEP_INTERVAL;
+
                 stepped = true;
             }
 
             if controller.roll_is_moving()
                 && now >= next_roll_step_at
             {
-                let dt = now.duration_since(last_roll_update)
+                let dt = now
+                    .duration_since(last_roll_update)
                     .as_secs_f32();
 
                 controller.update_roll(dt);
 
                 last_roll_update = now;
-                next_roll_step_at = now + ROLL_STEP_INTERVAL;
+                next_roll_step_at =
+                    Instant::now() + ROLL_STEP_INTERVAL;
+
                 stepped = true;
             }
 
@@ -192,7 +276,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             let mut deadline = last + COMMAND_TIMEOUT;
 
             if controller.yaw_is_moving() {
-                deadline = deadline.min(next_yaw_step_at);
+                deadline = deadline.min(yaw.next_step_at);
             }
 
             if controller.pitch_is_moving() {
