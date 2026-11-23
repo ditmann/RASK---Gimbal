@@ -6,15 +6,15 @@ use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
-const YAW_MAX_PULSES_PER_SECOND: f64 = 1000.0;
+const YAW_MAX_PULSES_PER_SECOND: f64 = 800.0;
 const PITCH_MAX_PULSES_PER_SECOND: f64 = 400.0;
 const ROLL_MAX_PULSES_PER_SECOND: f64 = 400.0;
 
-const YAW_START_PULSES_PER_SECOND: f64 = 100.0;
+const YAW_START_PULSES_PER_SECOND: f64 = 80.0;
 const PITCH_START_PULSES_PER_SECOND: f64 = 50.0;
 const ROLL_START_PULSES_PER_SECOND: f64 = 50.0;
 
-const YAW_ACCELERATION: f64 = 5000.0;
+const YAW_ACCELERATION: f64 = 1500.0;
 const PITCH_ACCELERATION: f64 = 1500.0;
 const ROLL_ACCELERATION: f64 = 1500.0;
 
@@ -262,7 +262,6 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 && Instant::now() >= roll.next_step_at
             {
                 let remaining = controller.roll_remaining_steps();
-
                 roll.step(
                     remaining,
                     ROLL_START_PULSES_PER_SECOND,
