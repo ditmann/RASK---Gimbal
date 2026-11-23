@@ -6,11 +6,11 @@ use crate::gimbal_controller::GimbalController;
 use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
-const YAW_MAX_PULSES_PER_SECOND: f64 = 800.0;
+const YAW_MAX_PULSES_PER_SECOND: f64 = 1000.0;
 const PITCH_MAX_PULSES_PER_SECOND: f64 = 400.0;
 const ROLL_MAX_PULSES_PER_SECOND: f64 = 400.0;
 
-const YAW_START_PULSES_PER_SECOND: f64 = 80.0;
+const YAW_START_PULSES_PER_SECOND: f64 = 1000.0;
 const PITCH_START_PULSES_PER_SECOND: f64 = 50.0;
 const ROLL_START_PULSES_PER_SECOND: f64 = 50.0;
 
