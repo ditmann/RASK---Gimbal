@@ -7,8 +7,8 @@ use crate::movement::{self, MovementCommand};
 use crate::orientation::Orientation;
 
 const YAW_MAX_PULSES_PER_SECOND: f64 = 1000.0;
-const PITCH_MAX_PULSES_PER_SECOND: f64 = 400.0;
-const ROLL_MAX_PULSES_PER_SECOND: f64 = 400.0;
+const PITCH_MAX_PULSES_PER_SECOND: f64 = 300.0;
+const ROLL_MAX_PULSES_PER_SECOND: f64 = 300.0;
 
 const YAW_START_PULSES_PER_SECOND: f64 = 100.0;
 const PITCH_START_PULSES_PER_SECOND: f64 = 50.0;
@@ -16,7 +16,7 @@ const ROLL_START_PULSES_PER_SECOND: f64 = 50.0;
 
 const YAW_ACCELERATION: f64 = 1500.0;
 const PITCH_ACCELERATION: f64 = 500.0;
-const ROLL_ACCELERATION: f64 = 1500.0;
+const ROLL_ACCELERATION: f64 = 500.0;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(200);
 
