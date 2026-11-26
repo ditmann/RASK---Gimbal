@@ -112,3 +112,12 @@ impl GimbalController {
         );
     }
 }
+#[cfg(all(
+    test,
+    not(all(
+        target_os = "linux",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))
+))]
+#[path = "../../tests/server/gimbal_controller_tests.rs"]
+mod tests;

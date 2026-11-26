@@ -36,3 +36,7 @@ impl OrientationPacket {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/server/packet_tests.rs"]
+mod tests;

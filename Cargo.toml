@@ -19,12 +19,28 @@ vr = ["dep:openvr"]
 [profile.dev.package.openvr_sys]
 opt-level = 1
 
+[lib]
+name = "rask_gimbal"
+path = "Server/src/lib.rs"
 
 [[bin]]
 name = "client"
-path = "Client/ClientAPI.rs"
+path = "Client/src/ClientAPI.rs"
 required-features = ["vr"]
 
 [[bin]]
 name = "server"
-path = "Server/main.rs"
+path = "Server/src/main.rs"
+test = false
+
+[[bin]]
+name = "mock"
+path = "Client/src/mock_gimbal.rs"
+
+[[bin]]
+name = "manual"
+path = "Client/src/manual_gimbal.rs"
+
+[[test]]
+name = "client_unit_tests"
+path = "Client/src/ClientAPI.rs"

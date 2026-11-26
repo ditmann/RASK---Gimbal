@@ -125,6 +125,40 @@ fn collect_command(
     }
 }
 
+fn command_timed_out(
+    last_target_at: Option<Instant>,
+    now: Instant,
+) -> bool {
+    match last_target_at {
+        Some(last) => {
+            now.saturating_duration_since(last) >= COMMAND_TIMEOUT
+        }
+        None => false,
+    }
+}
+
+fn stop_on_timeout(
+    controller: &mut GimbalController,
+    yaw: &mut MotorRamp,
+    pitch: &mut MotorRamp,
+    roll: &mut MotorRamp,
+    last_target_at: &mut Option<Instant>,
+    now: Instant,
+) -> bool {
+    if !command_timed_out(*last_target_at, now) {
+        return false;
+    }
+
+    controller.clear_target();
+    yaw.reset();
+    pitch.reset();
+    roll.reset();
+
+    *last_target_at = None;
+
+    true
+}
+
 pub fn run(receiver: Receiver<MovementCommand>) {
     let mut controller = GimbalController::new();
 
@@ -203,18 +237,15 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
         }
 
-        if let Some(last) = last_target_at {
-            if last.elapsed() >= COMMAND_TIMEOUT {
-                controller.clear_target();
-
-                yaw.reset();
-                pitch.reset();
-                roll.reset();
-
-                last_target_at = None;
-
-                println!("Motor stopped: command timeout.");
-            }
+        if stop_on_timeout(
+            &mut controller,
+            &mut yaw,
+            &mut pitch,
+            &mut roll,
+            &mut last_target_at,
+            Instant::now(),
+        ) {
+            println!("Motor stopped: command timeout.");
         }
 
         if last_target_at.is_some() {
@@ -262,6 +293,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
                 && Instant::now() >= roll.next_step_at
             {
                 let remaining = controller.roll_remaining_steps();
+
                 roll.step(
                     remaining,
                     ROLL_START_PULSES_PER_SECOND,
@@ -330,3 +362,23 @@ pub fn run(receiver: Receiver<MovementCommand>) {
         }
     }
 }
+
+#[cfg(all(
+    test,
+    not(all(
+        target_os = "linux",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))
+))]
+#[path = "../../tests/server/motor_ramp_tests.rs"]
+mod motor_ramp_tests;
+
+#[cfg(all(
+    test,
+    not(all(
+        target_os = "linux",
+        any(target_arch = "arm", target_arch = "aarch64")
+    ))
+))]
+#[path = "../../tests/server/motor_loop_tests.rs"]
+mod motor_loop_tests;
