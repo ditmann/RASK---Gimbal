@@ -140,13 +140,6 @@ fn main() {
                 Ok(_) => {
                     last_sent_steps = Some(filtered_steps);
                     last_sent_at = Some(Instant::now());
-
-                    println!(
-                        "Sent {_millis}ms | Y:{} P:{} R:{}",
-                        filtered_steps[0],
-                        filtered_steps[1],
-                        filtered_steps[2]
-                    );
                 }
 
                 Err(error) => {
