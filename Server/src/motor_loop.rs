@@ -1,4 +1,3 @@
-
 use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -163,7 +162,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
     let mut controller = GimbalController::new();
 
     let mut last_target_at: Option<Instant> = None;
-    let mut last_print = Instant::now();
+    // let mut last_print = Instant::now();
 
     let mut yaw = MotorRamp::new();
     let mut pitch = MotorRamp::new();
@@ -171,7 +170,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
 
     let mut pending_command: Option<MovementCommand> = None;
 
-    println!("Motor thread started.");
+    // println!("Motor thread started.");
 
     loop {
         let mut latest_target = None;
@@ -245,7 +244,7 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             &mut last_target_at,
             Instant::now(),
         ) {
-            println!("Motor stopped: command timeout.");
+            // println!("Motor stopped: command timeout.");
         }
 
         if last_target_at.is_some() {
@@ -309,13 +308,15 @@ pub fn run(receiver: Receiver<MovementCommand>) {
             }
 
             if stepped {
-                if last_print.elapsed() >= Duration::from_millis(500) {
-                    controller.print_status();
-                    last_print = Instant::now();
-                }
+                // if last_print.elapsed() >= Duration::from_millis(500) {
+                //     controller.print_status();
+                //     last_print = Instant::now();
+                // }
 
                 continue;
             }
+
+            continue;
         }
 
         if let Some(last) = last_target_at {
